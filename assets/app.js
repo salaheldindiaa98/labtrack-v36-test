@@ -494,17 +494,26 @@ async function boot(){const c=localStorage.getItem('labtrack-v36-test-config');
   if(localStorage.getItem('labtrack-device-cache')==='1'){try{await db.enablePersistence({synchronizeTabs:true})}catch(e){cacheWarning='Offline cache unavailable on this device: '+e.message;console.warn(cacheWarning)}}
   auth.onAuthStateChanged(async u=>{S.user=u||null;if(signupBusy)return;if(!u){stopLive();stopProfileWatch();S.profile=null;return login()}await gateUser(u)})}
 function setup(err=''){$('#app').innerHTML=`<main><div class=card><h2>LabTrack setup</h2>
-<p class=m>1. In Firebase create a Web app and copy its firebaseConfig.<br>2. Authentication → Sign-in method: enable <b>Email/Password</b>. You do not need to add instructors under Firebase Users.<br>3. Firestore Database → Rules: paste the secure rules below and Publish. The first LabTrack account created in a new database becomes the admin; later accounts wait for admin approval.</p>
+<p class=m>1. In Firebase create a Web app and copy its firebaseConfig.<br>2. Authentication → Sign-in method: enable <b>Email/Password</b>. You do not need to add instructors under Firebase Users.<br>3. Keep the test Firestore rules locked until the administrator permissions have been reviewed. Do not publish the displayed sample rules without review.</p>
 <pre class=rulesbox>${esc(SEC_RULES)}</pre><button class=g onclick=copyRules()>Copy security rules</button>
 <label>Paste your firebaseConfig here<textarea id=cfgt rows=7 style="width:100%"></textarea></label>
 <p class=e>${esc(err)}</p><button onclick=saveCfg()>Save and continue</button></div></main>`}
-function saveCfg(){const o={};for(const m of $('#cfgt').value.matchAll(/(\w+)\s*:\s*["']([^"']+)["']/g))o[m[1]]=m[2];
+function saveCfg(){
+ const raw=$('#cfgt').value.trim();
+ let o={};
+ try {
+   const clean=raw.replace(/^const\s+firebaseConfig\s*=\s*/, '').replace(/;\s*$/, '');
+   o=JSON.parse(clean);
+ } catch (_) {
+   for(const m of raw.matchAll(/(?:[\"']?)(\w+)(?:[\"']?)\s*:\s*[\"']([^\"']+)[\"']/g))o[m[1]]=m[2];
+ }
+
  if(!o.apiKey||!o.projectId)return setup('apiKey or projectId not found. Paste the whole config.');if(!validTestConfig(o))return setup('Blocked: create a separate Firebase TEST project with test/stage/dev/sandbox in its ID. Production is forbidden.');localStorage.setItem('labtrack-v36-test-config',JSON.stringify(o));location.reload()}
 async function copyRules(){try{await navigator.clipboard.writeText(SEC_RULES);alert('Security rules copied. Paste them in Firebase → Firestore Database → Rules and press Publish.')}catch(_){alert('Copy failed. Select the rules text and copy it manually.')}}
 function login(err='',mode='signin',note=''){$('#app').innerHTML=`<div class=authwrap><div class="card authcard"><div class=authbrand><h1>LabTrack</h1><p>Instructor access · v33</p></div>
 <div class=authseg><button class="${mode==='signin'?'on':''}" onclick="login('','signin')">Sign in</button><button class="${mode==='signup'?'on':''}" onclick="login('','signup')">Create account</button></div>
 ${mode==='signup'?`<label>Full name<input id=nm autocomplete=name placeholder="Instructor name"></label><label>Email<input id=em type=email autocomplete=email></label><label>Password<input id=pw type=password autocomplete=new-password minlength=6></label><label>Confirm password<input id=pw2 type=password autocomplete=new-password minlength=6></label><button class=wide onclick=signUp()>Create LabTrack account</button><p class=m>Your account will remain pending until a LabTrack admin approves it.</p>`:mode==='forgot'?`<h3>Reset password</h3><label>Email<input id=em type=email autocomplete=email></label><button class=wide onclick=sendReset()>Send reset email</button><button class="authlink wide" onclick="login('','signin')">Back to sign in</button>`:`<label>Email<input id=em type=email autocomplete=email></label><label>Password<input id=pw type=password autocomplete=current-password onkeydown="if(event.key==='Enter')signIn()"></label><button class=wide onclick=signIn()>Sign in</button><button class="authlink wide" onclick="login('','forgot')">Forgot password?</button>`}
-${note?`<p class=m>${esc(note)}</p>`:''}${err?`<p class=e>${esc(err)}</p>`:''}<div style="margin-top:14px;text-align:center"><button class=g onclick="localStorage.removeItem('fbc');location.reload()">Change Firebase setup</button></div></div></div>`}
+${note?`<p class=m>${esc(note)}</p>`:''}${err?`<p class=e>${esc(err)}</p>`:''}<div style="margin-top:14px;text-align:center"><button class=g onclick="localStorage.removeItem('labtrack-v36-test-config');location.reload()">Change Firebase setup</button></div></div></div>`}
 function friendlyAuth(e){const c=e?.code||'',m={
  'auth/email-already-in-use':'An account already exists with this email. Use Sign in instead.',
  'auth/invalid-email':'Enter a valid email address.','auth/weak-password':'Use a password of at least 6 characters.',
